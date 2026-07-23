@@ -32,6 +32,13 @@
 
 - Added `.env` and `*.env` to `.gitignore` to prevent accidental token commits.
 
+### Security (audit)
+
+- Audit `memory-mcp-trio-repo-standard-2026-07` (2026-07-23): clean — bearer-auth and
+  `index_memory` path allowlist verified intact through the src/ move. 1 Low accepted:
+  tool errors return raw exception text to the (loopback, trusted-agent) caller —
+  `SECURITY[accepted]` in `server.py`.
+
 ## [0.1.0] — 2026-05-29
 
 ### Added

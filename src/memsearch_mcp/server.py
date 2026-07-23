@@ -163,6 +163,9 @@ async def search_memory(query: str, limit: int = 10) -> list[dict]:
         return results
     except Exception as exc:
         log.error("search_memory_error", query=query, error=str(exc))
+        # SECURITY[accepted]: returns raw exception text to the caller. Accepted risk —
+        # loopback-only server, callers are trusted forge agents, no untrusted boundary.
+        # audit memory-mcp-trio-repo-standard-2026-07 (2026-07-23). Revisit if exposed.
         return [{"error": str(exc)}]
 
 
