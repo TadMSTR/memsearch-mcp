@@ -2,12 +2,31 @@
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-07-23
+
 ### Security
 
 - **Bearer token authentication** — optional `_BearerAuthMiddleware` ASGI middleware
   activated when `MEMSEARCH_API_TOKEN` is set. Uses `hmac.compare_digest()` for
   constant-time token comparison. Returns 401 JSON error for invalid/missing tokens.
   Disabled by default (logs warning at startup when no token configured).
+
+### Changed
+
+- **Repo brought to the forge Python-MCP standard.** Migrated to a `src/memsearch_mcp/`
+  layout (package import path and PM2 entry point `-m memsearch_mcp.server` unchanged;
+  needs a `pip install -e .` refresh in the venv on cutover).
+- Bumped `fastmcp` pin `>=2.0` → `>=3.2.4,<4` (matches the installed 3.x and sibling repos).
+
+### Added
+
+- MIT `LICENSE`.
+- CI workflow (`.github/workflows/ci.yml`) — 3.11/3.12/3.13 matrix, SHA-pinned actions;
+  `ruff check` + `ruff format --check` + `pytest --cov` (fail-under 80) + `pip-audit --strict`.
+- `ruff` + coverage config; `.gitleaks.toml`; `CONTRIBUTING.md`; `ARCHITECTURE.md`.
+- `tests/conftest.py` stub so the suite runs without the (non-PyPI) `memsearch` library.
+- Tests for the `index_memory` file/directory branches and the `main()` entry point
+  (coverage 77% → ≥80%).
 
 ### Fixed
 

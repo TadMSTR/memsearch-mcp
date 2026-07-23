@@ -66,7 +66,7 @@ Requires Python 3.11+ and an existing memsearch venv with the `memsearch` librar
 
 ### Dependencies
 
-- `fastmcp>=2.0`
+- `fastmcp>=3.2.4,<4`
 - `pydantic>=2.0`
 - `structlog>=24.0`
 - `memsearch` (must be installed in the same venv — not in PyPI, install from source)

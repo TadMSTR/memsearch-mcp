@@ -14,11 +14,11 @@ Provides two tools for searching and re-indexing the forge agent memory store ba
 ## Structure
 
 ```
-memsearch_mcp/
+src/memsearch_mcp/
   __init__.py
   server.py         FastMCP server — 2 tools, MemSearch init, HMAC auth middleware, path whitelist
   models.py         MemoryResult pydantic model
-tests/              pytest tests
+tests/              pytest tests (conftest.py stubs `memsearch` when the lib is absent)
 ecosystem.config.js PM2 config
 pyproject.toml
 ```

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import pytest
-from unittest.mock import AsyncMock, patch
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from memsearch_mcp.models import MemoryResult, infer_tier
-
 
 # ---------------------------------------------------------------------------
 # Unit tests — models
@@ -39,7 +39,9 @@ def test_infer_tier_unknown():
 def test_infer_tier_crafted_path_not_misclassified():
     """MEM-02: substring match would classify these as working/session; is_relative_to must not."""
     assert infer_tier("/tmp/evil/.claude/memory/attack.md") == "unknown"
-    assert infer_tier("/tmp/evil/.memsearch/memory/attack.md") == "session"  # .memsearch in parts → session is ok
+    assert (
+        infer_tier("/tmp/evil/.memsearch/memory/attack.md") == "session"
+    )  # .memsearch in parts → session is ok
     assert infer_tier("/var/evil/.claude/memory/docs/attack.md") == "unknown"
 
 
@@ -84,6 +86,7 @@ def test_memory_result_from_hit_null_heading():
 async def test_index_memory_rejects_etc():
     """MEM-01: /etc/ is outside allowed roots and must be rejected."""
     from memsearch_mcp.server import index_memory
+
     result = await index_memory("/etc/passwd")
     assert "error" in result
     assert "allowed index roots" in result["error"]
@@ -93,6 +96,7 @@ async def test_index_memory_rejects_etc():
 async def test_index_memory_rejects_secrets():
     """MEM-01: ~/.secrets/ is outside allowed roots and must be rejected."""
     from memsearch_mcp.server import index_memory
+
     result = await index_memory(str(Path.home() / ".secrets"))
     assert "error" in result
     assert "allowed index roots" in result["error"]
@@ -102,6 +106,7 @@ async def test_index_memory_rejects_secrets():
 async def test_index_memory_rejects_crafted_traversal():
     """MEM-01: path traversal attempt must be rejected after resolve()."""
     from memsearch_mcp.server import index_memory
+
     result = await index_memory(str(Path.home() / ".claude/memory/../../.secrets"))
     assert "error" in result
 
@@ -110,6 +115,7 @@ async def test_index_memory_rejects_crafted_traversal():
 async def test_index_memory_nonexistent_path():
     """index_memory returns error for a path that doesn't exist."""
     from memsearch_mcp.server import index_memory
+
     result = await index_memory("/nonexistent/path/that/does/not/exist")
     assert "error" in result
 
@@ -135,6 +141,7 @@ async def test_search_memory_returns_list():
     with patch("memsearch_mcp.server._ms") as mock_ms:
         mock_ms.search = AsyncMock(return_value=mock_hits)
         from memsearch_mcp.server import search_memory
+
         results = await search_memory("test query", limit=5)
     assert isinstance(results, list)
     assert len(results) == 1
@@ -148,6 +155,7 @@ async def test_search_memory_error_returns_error_dict():
     with patch("memsearch_mcp.server._ms") as mock_ms:
         mock_ms.search = AsyncMock(side_effect=RuntimeError("Milvus down"))
         from memsearch_mcp.server import search_memory
+
         results = await search_memory("query")
     assert len(results) == 1
     assert "error" in results[0]
@@ -161,6 +169,7 @@ async def test_search_memory_error_returns_error_dict():
 def test_bearer_auth_middleware_allows_valid_token():
     """_BearerAuthMiddleware passes through requests with a valid token."""
     import asyncio
+
     from memsearch_mcp.server import _BearerAuthMiddleware
 
     called = []
@@ -187,6 +196,7 @@ def test_bearer_auth_middleware_allows_valid_token():
 def test_bearer_auth_middleware_rejects_missing_token():
     """_BearerAuthMiddleware returns 401 when Authorization header is absent."""
     import asyncio
+
     from memsearch_mcp.server import _BearerAuthMiddleware
 
     responses = []
@@ -219,6 +229,7 @@ def test_bearer_auth_middleware_rejects_missing_token():
 def test_bearer_auth_middleware_rejects_wrong_token():
     """_BearerAuthMiddleware returns 401 for an invalid token."""
     import asyncio
+
     from memsearch_mcp.server import _BearerAuthMiddleware
 
     responses = []
@@ -250,6 +261,7 @@ def test_bearer_auth_middleware_rejects_wrong_token():
 def test_bearer_auth_middleware_passes_non_http_scope():
     """_BearerAuthMiddleware passes through non-HTTP (e.g. websocket/lifespan) scopes."""
     import asyncio
+
     from memsearch_mcp.server import _BearerAuthMiddleware
 
     called = []
@@ -265,3 +277,92 @@ def test_bearer_auth_middleware_passes_non_http_scope():
 
     asyncio.run(run())
     assert called == ["lifespan"]
+
+
+# ---------------------------------------------------------------------------
+# index_memory success branches (file + directory)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_index_memory_indexes_file(tmp_path, monkeypatch):
+    """A file within an allowed root is indexed via _ms.index_file."""
+    from memsearch_mcp import server as srv
+
+    note = tmp_path / "note.md"
+    note.write_text("hello")
+    monkeypatch.setattr(srv, "_ALLOWED_INDEX_ROOTS", [tmp_path])
+    monkeypatch.setattr(srv._ms, "index_file", AsyncMock(return_value=3))
+
+    result = await srv.index_memory(str(note))
+    assert result == {"indexed": 3, "path": str(note)}
+
+
+@pytest.mark.asyncio
+async def test_index_memory_indexes_directory(tmp_path, monkeypatch):
+    """A directory within an allowed root spins up a scoped MemSearch and indexes it."""
+    from memsearch_mcp import server as srv
+
+    monkeypatch.setattr(srv, "_ALLOWED_INDEX_ROOTS", [tmp_path])
+
+    indexer = AsyncMock()
+    indexer.index = AsyncMock(return_value=7)
+    indexer.close = lambda: None
+    fake_cls = patch.object(srv, "MemSearch", return_value=indexer)
+    with fake_cls:
+        result = await srv.index_memory(str(tmp_path))
+
+    assert result == {"indexed": 7, "path": str(tmp_path)}
+    indexer.index.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_index_memory_directory_exception_returns_error(tmp_path, monkeypatch):
+    """An exception inside the directory branch is caught and returned as an error dict."""
+    from memsearch_mcp import server as srv
+
+    monkeypatch.setattr(srv, "_ALLOWED_INDEX_ROOTS", [tmp_path])
+    with patch.object(srv, "MemSearch", side_effect=RuntimeError("boom")):
+        result = await srv.index_memory(str(tmp_path))
+    assert "error" in result
+    assert "boom" in result["error"]
+
+
+# ---------------------------------------------------------------------------
+# main() entry point
+# ---------------------------------------------------------------------------
+
+
+def test_main_runs_without_token(monkeypatch):
+    """main() starts the server with no auth middleware when no token is set."""
+    from memsearch_mcp import server as srv
+
+    monkeypatch.delenv("MEMSEARCH_API_TOKEN", raising=False)
+    captured = {}
+
+    def fake_run(**kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(srv.mcp, "run", fake_run)
+    srv.main()
+    assert captured["transport"] == "streamable-http"
+    assert captured["port"] == 8493
+    assert captured["middleware"] is None
+
+
+def test_main_runs_with_token(monkeypatch):
+    """main() installs the bearer-auth middleware when a token is set."""
+    from memsearch_mcp import server as srv
+
+    monkeypatch.setenv("MEMSEARCH_API_TOKEN", "tok")
+    monkeypatch.setenv("MEMSEARCH_MCP_PORT", "9999")
+    captured = {}
+
+    def fake_run(**kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(srv.mcp, "run", fake_run)
+    srv.main()
+    assert captured["port"] == 9999
+    assert captured["middleware"] is not None
+    assert len(captured["middleware"]) == 1
