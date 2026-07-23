@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -45,13 +44,13 @@ class MemoryResult(BaseModel):
     path: str
     score: float
     snippet: str
-    heading: Optional[str]
+    heading: str | None
     tier: str
     start_line: int
     end_line: int
 
     @classmethod
-    def from_hit(cls, hit: dict) -> "MemoryResult":
+    def from_hit(cls, hit: dict) -> MemoryResult:
         source = hit.get("source", "")
         return cls(
             path=source,

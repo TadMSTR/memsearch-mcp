@@ -10,17 +10,16 @@ from __future__ import annotations
 import hmac
 import os
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 from fastmcp import FastMCP
+from memsearch import MemSearch
+from memsearch.config import resolve_config
 from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import Response
 from starlette.types import ASGIApp, Receive, Scope, Send
-
-from memsearch import MemSearch
-from memsearch.config import resolve_config
 
 from .models import MemoryResult
 
@@ -112,7 +111,11 @@ class _BearerAuthMiddleware:
         if scope["type"] == "http":
             request = Request(scope, receive)
             auth_header = request.headers.get("authorization", "")
-            provided = auth_header.removeprefix("Bearer ") if auth_header.lower().startswith("bearer ") else ""
+            provided = (
+                auth_header.removeprefix("Bearer ")
+                if auth_header.lower().startswith("bearer ")
+                else ""
+            )
             if not hmac.compare_digest(provided, self._token):
                 response = Response(
                     content='{"error":"Unauthorized"}',
@@ -150,7 +153,7 @@ async def search_memory(query: str, limit: int = 10) -> list[dict]:
     """Search indexed agent memory using hybrid vector+BM25+reranker.
 
     Returns results sorted by relevance with path, score, snippet, tier, and heading.
-    Tier labels: session (.memsearch/memory/), working (~/.claude/memory/), docs (~/.claude/memory/docs/).
+    Tier labels: session (.memsearch/memory/), working (~/.claude/memory/), docs (memory/docs/).
     """
     log.info("search_memory", query=query, limit=limit)
     try:
@@ -160,11 +163,14 @@ async def search_memory(query: str, limit: int = 10) -> list[dict]:
         return results
     except Exception as exc:
         log.error("search_memory_error", query=query, error=str(exc))
+        # SECURITY[accepted]: returns raw exception text to the caller. Accepted risk —
+        # loopback-only server, callers are trusted forge agents, no untrusted boundary.
+        # audit memory-mcp-trio-repo-standard-2026-07 (2026-07-23). Revisit if exposed.
         return [{"error": str(exc)}]
 
 
 @mcp.tool()
-async def index_memory(path: Optional[str] = None) -> dict:
+async def index_memory(path: str | None = None) -> dict:
     """Trigger a memsearch index refresh.
 
     If path is given, indexes that directory or file within allowed roots.
@@ -231,7 +237,9 @@ def main() -> None:
     else:
         log.info("memsearch_mcp_bearer_auth_disabled", reason="MEMSEARCH_API_TOKEN not set")
     try:
-        mcp.run(transport="streamable-http", host="127.0.0.1", port=port, middleware=middleware or None)
+        mcp.run(
+            transport="streamable-http", host="127.0.0.1", port=port, middleware=middleware or None
+        )
     except (KeyboardInterrupt, SystemExit):
         log.info("memsearch_mcp_shutdown")
 

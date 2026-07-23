@@ -7,3 +7,6 @@ dist/
 build/
 .env
 *.env
+.ruff_cache/
+core.*
+*.core
