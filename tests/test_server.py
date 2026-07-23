@@ -15,16 +15,16 @@ from memsearch_mcp.models import MemoryResult, infer_tier
 
 
 def test_infer_tier_session():
-    assert infer_tier("/home/ted/.memsearch/memory/2026-05-28.md") == "session"
+    assert infer_tier(str(Path.home() / ".memsearch/memory/2026-05-28.md")) == "session"
 
 
 def test_infer_tier_working():
-    assert infer_tier("/home/ted/.claude/memory/shared/context.md") == "working"
-    assert infer_tier("/home/ted/.claude/memory/agents/developer/notes.md") == "working"
+    assert infer_tier(str(Path.home() / ".claude/memory/shared/context.md")) == "working"
+    assert infer_tier(str(Path.home() / ".claude/memory/agents/developer/notes.md")) == "working"
 
 
 def test_infer_tier_docs():
-    assert infer_tier("/home/ted/.claude/memory/docs/architecture.md") == "docs"
+    assert infer_tier(str(Path.home() / ".claude/memory/docs/architecture.md")) == "docs"
 
 
 def test_infer_tier_agents_memory():
@@ -47,7 +47,7 @@ def test_infer_tier_crafted_path_not_misclassified():
 
 def test_memory_result_from_hit():
     hit = {
-        "source": "/home/ted/.claude/memory/shared/notes.md",
+        "source": str(Path.home() / ".claude/memory/shared/notes.md"),
         "score": 0.87654,
         "content": "Some memory content here.",
         "heading": "## Notes",
@@ -130,7 +130,7 @@ async def test_search_memory_returns_list():
     """search_memory returns a list of dicts (mocked memsearch)."""
     mock_hits = [
         {
-            "source": "/home/ted/.claude/memory/shared/test.md",
+            "source": str(Path.home() / ".claude/memory/shared/test.md"),
             "score": 0.9,
             "content": "Test content",
             "heading": "# Test",
